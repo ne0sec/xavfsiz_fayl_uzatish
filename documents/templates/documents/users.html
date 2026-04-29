@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+
+{% block title %}Foydalanuvchilar Ro'yxati{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h3 class="text-primary">Foydalanuvchilar Ro'yxati</h3>
+        <p class="text-muted">Fayl yubormoqchi bo'lgan xodimni username yoki ismi bo'yicha qidiring.</p>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <form method="get" class="d-flex">
+            <input type="text" name="q" value="{{ query }}" class="form-control me-2" placeholder="Username, ism yoki familiya...">
+            <button type="submit" class="btn btn-outline-primary">Qidirish</button>
+            <a href="{% url 'user_directory' %}" class="btn btn-outline-secondary ms-2">Tozalash</a>
+        </form>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card shadow">
+            <div class="card-body">
+                <table class="table table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Username</th>
+                            <th>Ism va Familiya</th>
+                            <th>Roli</th>
+                            <th>Amal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for u in users %}
+                        <tr>
+                            <td class="fw-bold">{{ u.username }}</td>
+                            <td>{{ u.first_name }} {{ u.last_name }}</td>
+                            <td><span class="badge bg-info">{{ u.get_role_display }}</span></td>
+                            <td>
+                                <a href="{% url 'upload' %}?receiver={{ u.id }}" class="btn btn-sm btn-success">
+                                    Fayl yuborish
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center text-muted">Foydalanuvchi topilmadi...</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

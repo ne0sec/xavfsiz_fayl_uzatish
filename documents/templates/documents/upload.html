@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+
+{% block title %}Hujjat Yuklash{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card shadow mt-4">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">Yangi Hujjat Yuklash (AES-256-GCM)</h4>
+            </div>
+            <div class="card-body">
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label class="form-label text-muted fw-bold">Hujjat nomi</label>
+                        <input type="text" name="title" class="form-control" placeholder="Masalan: Maxfiy Hisobot 2026" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label text-muted fw-bold">Qisqacha tavsifi</label>
+                        <textarea name="description" class="form-control" rows="3" placeholder="Hujjat haqida qisqacha ma'lumot..."></textarea>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label text-muted fw-bold">Maxfiylik darajasi</label>
+                            <select name="privacy_level" id="privacy_level" class="form-select" required>
+                                <option value="simple">Oddiy (Himoyalanmagan)</option>
+                                <option value="protected" selected>Himoyalangan (SSS orqali)</option>
+                            </select>
+                        </div>
+                        
+                       <div class="col-md-4 mb-3">
+                            <label class="form-label text-muted fw-bold">Qabul Qiluvchi</label>
+                            <select name="receiver" class="form-select" required>
+                                <option value="">Tanlang...</option>
+                                {% for r in receivers %}
+                                    <option value="{{ r.id }}" {% if selected_receiver_id == r.id|stringformat:"s" %}selected{% endif %}>
+                                        {{ r.username }} ({{ r.last_name }} {{ r.first_name }})
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-md-4 mb-3" id="approver-div">
+                            <label for="approver" class="form-label text-muted fw-bold">Tasdiqlovchi (Director)</label>
+                            <select name="approver" id="approver" class="form-select">
+                                <option value="" disabled selected>Tasdiqlovchini tanlang...</option>
+                                {% for approver in approvers %}
+                                    <option value="{{ approver.id }}">{{ approver.first_name }} {{ approver.last_name }} ({{ approver.username }}) - {{ approver.get_role_display }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-3 mt-2">
+                        <label class="form-label text-muted fw-bold">Faylni tanlang</label>
+                        <input type="file" name="file" class="form-control form-control-lg" required>
+                    </div>
+
+                    <div class="d-grid gap-2 mt-4">
+                        <button type="submit" class="btn btn-success btn-lg">Shifrlash va Saqlash</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const privacySelect = document.getElementById("privacy_level");
+    const approverDiv = document.getElementById("approver-div");
+    const approverSelect = document.getElementById("approver");
+
+    function toggleApprover() {
+        if (privacySelect.value === "simple") {
+            // Oddiy bo'lsa, tasdiqlovchi blokini yashiramiz va majburiy talabni olamiz
+            approverDiv.style.display = "none";
+            approverSelect.removeAttribute("required");
+            approverSelect.value = ""; // Tanlovni tozalab yuboramiz
+        } else {
+            // Himoyalangan bo'lsa, qayta ko'rsatamiz va majburiy qilamiz
+            approverDiv.style.display = "block";
+            approverSelect.setAttribute("required", "required");
+        }
+    }
+
+    // Sahifa yuklanganda bir marta tekshiramiz
+    toggleApprover();
+
+    // Foydalanuvchi darajani o'zgartirganda hodisani ushlaymiz
+    privacySelect.addEventListener("change", toggleApprover);
+});
+</script>
+{% endblock %}

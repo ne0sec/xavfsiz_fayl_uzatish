@@ -1,0 +1,170 @@
+{% extends 'base.html' %}
+
+{% block title %}Kiruvchi Hujjatlar va Tasdiqlar{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h3 class="text-primary">📥 Kiruvchi va Tasdiqlar</h3>
+        <p class="text-muted">Bu yerda sizga kelib tushgan hujjatlarni va sizdan tasdiq kutayotgan so'rovlarni boshqarasiz.</p>
+    </div>
+</div>
+
+{% if pending_approvals is not None %}
+<div class="row mb-5">
+    <div class="col-md-12">
+        <div class="card shadow border-warning">
+            <div class="card-header bg-warning text-dark fw-bold">
+                ⏳ Tasdiq Kutayotgan So'rovlar
+            </div>
+            <div class="card-body">
+                {% if pending_approvals %}
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Hujjat</th>
+                                <th>Kimdan (Egasi)</th>
+                                <th>Kimga (Qabul qiluvchi)</th>
+                                <th>Vaqt</th>
+                                <th>Amallar</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for approval in pending_approvals %}
+                            <tr>
+                                <td>{{ approval.document.title }}</td>
+                                <td>{{ approval.document.owner.username }}</td>
+                                <td>{{ approval.receiver.username }}</td>
+                                <td>{{ approval.created_at|date:"Y-m-d H:i" }}</td>
+                                <td>
+                                    
+                                    <a href="{% url 'approve_document' approval.id %}" class="btn btn-sm btn-success">Tasdiqlash (SSS)</a>
+                                    <a href="{% url 'reject_document' approval.id %}" class="btn btn-sm btn-danger">Rad etish</a>
+                                    
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p class="text-muted mb-0">Hozircha sizdan tasdiq kutayotgan hujjatlar yo'q.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card shadow border-info">
+            <div class="card-header bg-info text-white fw-bold">
+                📂 Menga Yuborilgan Hujjatlar
+            </div>
+            <div class="card-body">
+                {% if received_shares %}
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Hujjat</th>
+                                <th>Kimdan</th>
+                                <th>Maxfiylik</th>
+                                <th>Holati</th>
+                                <th>Amallar</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for share in received_shares %}
+                            <tr>
+                                <td>{{ share.document.title }}</td>
+                                <td>{{ share.document.owner.username }}</td>
+                                <td>{{ share.document.get_privacy_level_display }}</td>
+                                <td>
+                                    {% if share.status == 'approved' %}
+                                        <span class="badge bg-success">Tasdiqlangan</span>
+                                    {% elif share.status == 'pending' %}
+                                        <span class="badge bg-warning text-dark">Kutilmoqda</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">Rad etilgan</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if share.status == 'approved' or share.document.privacy_level == 'simple' %}
+                                        <a href="{% url 'download_document' share.id %}" class="btn btn-sm btn-primary download-btn">Yuklab olish / Deshifr</a>
+                                    {% else %}
+                                        <button class="btn btn-sm btn-secondary" disabled>Kutilmoqda</button>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p class="text-muted mb-0">Sizga hali hujjat yuborilmagan.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+  <div id="hashToast" class="toast align-items-center border-0" role="alert" aria-live="assertive" aria-atomic="true">
+    <div class="d-flex">
+      <div class="toast-body fw-bold fs-6" id="toastBody">
+        </div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    // Cookie ni o'qish uchun yordamchi funksiya
+    function getCookie(name) {
+        let matches = document.cookie.match(new RegExp(
+            "(?:^|; )" + name.replace(/([\.$?*|{}\(\)\[\]\\\/\+^])/g, '\\$1') + "=([^;]*)"
+        ));
+        return matches ? decodeURIComponent(matches[1]) : undefined;
+    }
+
+    // Barcha yuklab olish tugmalarini ushlab olamiz
+    let downloadBtns = document.querySelectorAll('.download-btn');
+    
+    downloadBtns.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            // Tugma bosilganda har 500 millisoniyada Cookie ni tekshiramiz
+            let checkCookie = setInterval(function() {
+                let status = getCookie('hash_status');
+                
+                if (status) {
+                    // Cookie topildi! Tekshiruvni to'xtatamiz
+                    clearInterval(checkCookie);
+                    
+                    // Keyingi safar xalaqit bermasligi uchun Cookie ni tozalaymiz
+                    document.cookie = "hash_status=; max-age=-1; path=/";
+                    
+                    // Toast dizaynini sozlash va ko'rsatish
+                    let toastEl = document.getElementById('hashToast');
+                    let toastBody = document.getElementById('toastBody');
+                    
+                    if (status === 'valid') {
+                        toastBody.innerHTML = "✅ SHA-256 tasdiqlandi: Fayl butunligi mutlaqo o'zgarmagan!";
+                        toastEl.classList.remove('bg-danger');
+                        toastEl.classList.add('bg-success', 'text-white');
+                    } else {
+                        toastBody.innerHTML = "🚨 XAVF: SHA-256 xeshi mos kelmadi! Fayl buzilgan bo'lishi mumkin.";
+                        toastEl.classList.remove('bg-success');
+                        toastEl.classList.add('bg-danger', 'text-white');
+                    }
+                    
+                    // Bootstrap 5 Toast ni faollashtirish
+                    let toast = new bootstrap.Toast(toastEl);
+                    toast.show();
+                }
+            }, 500);
+        });
+    });
+});
+</script>
+{% endblock %}

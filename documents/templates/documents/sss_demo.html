@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+
+{% block title %}Shamir Algoritmi (SSS) Namoyishi{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12 text-center">
+        <h3 class="text-primary">🔐 Shamir Sirni Taqsimlash Namoyishi</h3>
+        <p class="text-muted">Bu sahifada 1 ta ulush kalitni tiklay olmasligini va kamida 2 ta ulush birlashishi shartligini amalda tekshirib ko'rishingiz mumkin.</p>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card shadow border-primary">
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">1-Ulush (Share 1) - JSON formatda</label>
+                        <input type="text" name="share1" class="form-control" placeholder="Masalan: [1, 1157920892...]">
+                        <small class="text-muted">Bazada saqlangan ulushlardan birini shu yerga ko'chirib qo'ying.</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">2-Ulush (Share 2) - JSON formatda</label>
+                        <input type="text" name="share2" class="form-control" placeholder="Ikkinchi ulushni shu yerga kiriting...">
+                        <small class="text-danger">Topshiriq sharti: Avval faqat 1 ta ulush kiritib, tizim qanday xato berishini tekshirib ko'ring.</small>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary w-100">AES Kalitini Tiklashga Urinish</button>
+                </form>
+
+                {% if error_msg %}
+                <div class="alert alert-danger mt-4 shadow-sm">
+                    <strong>🚫 Bloklandi:</strong> {{ error_msg }}
+                </div>
+                {% endif %}
+
+                {% if result_key %}
+                <div class="alert alert-success mt-4 shadow-sm">
+                    <strong>✅ Muvaffaqiyatli! 2 ta ulush orqali 256-bitli AES kaliti tiklandi:</strong><br>
+                    <code class="text-dark" style="word-break: break-all; font-size: 1.1em;">{{ result_key }}</code>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+
+{% block title %}Boshqaruv Paneli{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-4">
+    <div class="col-md-10">
+        <h2 class="text-center mb-4 text-primary">Tizim imkoniyatlari</h2>
+        <div class="row text-center">
+            
+            <div class="col-md-4 mb-4">
+                <div class="card shadow h-100 border-primary">
+                    <div class="card-body py-4">
+                        <h4 class="card-title text-primary">🔍 Foydalanuvchilar</h4>
+                        <p class="card-text text-muted mt-2">Tizimdagi xodimlarni qidiring va tanlangan foydalanuvchiga to'g'ridan-to'g'ri hujjat yuboring.</p>
+                        <a href="{% url 'user_directory' %}" class="btn btn-primary mt-2 w-100">Xodimlarni qidirish</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4 mb-4">
+                <div class="card shadow h-100 border-success">
+                    <div class="card-body py-4">
+                        <h4 class="card-title text-success">📤 Hujjat Yuklash</h4>
+                        <p class="card-text text-muted mt-2">Yangi maxfiy hujjatlarni AES bilan shifrlang va SSS algoritmi orqali tarmoqqa yuklang.</p>
+                        <a href="{% url 'upload' %}" class="btn btn-success mt-2 w-100">Hujjat Yuklash oynasi</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4 mb-4">
+                <div class="card shadow h-100 border-warning">
+                    <div class="card-body py-4">
+                        <h4 class="card-title text-warning">📥 Kiruvchi va Tasdiqlar</h4>
+                        <p class="card-text text-muted mt-2">Sizga kelgan hujjatlarni ko'ring yoki tasdiqlovchi sifatida so'rovlarni boshqaring.</p>
+                        <a href="{% url 'inbox' %}" class="btn btn-warning mt-2 w-100 text-dark">Inbox / Tasdiqlash</a>
+                    </div>
+                </div>
+            </div>
+
+
+
+            {% if user.role == 'admin' or user.is_superuser %}
+            <div class="col-md-12 mb-4 mt-2">
+                <div class="card shadow h-100 border-danger bg-light">
+                    <div class="card-body py-4">
+                        <h4 class="card-title text-danger">🛡️ Audit Jurnali (Admin Panel)</h4>
+                        <p class="card-text text-muted mt-2">Tizimdagi barcha harakatlarni, yuklangan hujjatlar va tasdiqlash jarayonlarini kuzatib boring.</p>
+                        <a href="{% url 'audit_log' %}" class="btn btn-danger mt-2 w-50">Loglarni Ko'rish</a>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+
+            <div class="col-md-12 mb-4 mt-2">
+                <div class="card shadow h-100 border-info bg-light">
+                    <div class="card-body py-4 text-center">
+                        <h4 class="card-title text-info">🔬 Kriptografiya Laboratoriyasi (SSS Demo)</h4>
+                        <p class="card-text text-muted mt-2">Shamir algoritmi ishlashini amalda ko'rsating: 1 ta ulush bilan kalit tiklanmasligini isbotlang.</p>
+                        <a href="{% url 'sss_demo' %}" class="btn btn-info mt-2 w-50 text-white">Namoyishni boshlash</a>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}

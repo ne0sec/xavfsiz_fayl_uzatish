@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+
+{% block title %}Audit Jurnali{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12 text-center">
+        <h3 class="text-danger">🛡️ Tizim Audit Jurnali</h3>
+        <p class="text-muted">Barcha foydalanuvchilarning xatti-harakatlari va xavfsizlik voqealari ro'yxati (Faqat Adminlar uchun).</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card shadow border-danger">
+            <div class="card-body">
+                <table class="table table-striped table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>#</th>
+                            <th>Vaqt (Timestamp)</th>
+                            <th>Foydalanuvchi</th>
+                            <th>Harakat turi</th>
+                            <th>Tafsilotlar</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in logs %}
+                        <tr>
+                            <td class="text-muted">{{ forloop.counter }}</td>
+                            <td>{{ log.timestamp|date:"Y-m-d H:i:s" }}</td>
+                            <td class="fw-bold text-primary">{{ log.user.username|default:"Tizim/Noma'lum" }}</td>
+                            <td>
+                                {% if log.action == 'login' %}
+                                    <span class="badge bg-success">Kirish</span>
+                                {% elif log.action == 'upload' %}
+                                    <span class="badge bg-primary">Yuklash</span>
+                                {% elif log.action == 'approve' %}
+                                    <span class="badge bg-info text-dark">Tasdiqlash</span>
+                                {% elif log.action == 'download' %}
+                                    <span class="badge bg-warning text-dark">Deshifrlash</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">{{ log.get_action_display }}</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ log.details }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted">Hozircha audit jurnali bo'sh...</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
