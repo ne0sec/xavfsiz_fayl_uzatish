@@ -17,9 +17,11 @@ class DocumentShare(models.Model):
     
     # Shamir ulushlari uchun maydonlar (hex formatda saqlaymiz)
     # Eslatma: Real tizimlarda ular bitta bazada saqlanmaydi, bu faqat akademik namoyish uchun!
-    share_1 = models.CharField(max_length=255, blank=True, null=True, verbose_name="1-ulush (Baza uchun)")
-    share_2 = models.CharField(max_length=255, blank=True, null=True, verbose_name="2-ulush (Receiver uchun)")
-    share_3 = models.CharField(max_length=255, blank=True, null=True, verbose_name="3-ulush (Approver uchun)")
+    share_2 = models.TextField(blank=True, null=True)
+    share_3 = models.TextField(blank=True, null=True)
+    share_1 = models.TextField(blank=True, null=True, verbose_name="1-ulush (Baza uchun)")
+    #share_2 = models.CharField(max_length=255, blank=True, null=True, verbose_name="2-ulush (Receiver uchun)")
+    #share_3 = models.CharField(max_length=255, blank=True, null=True, verbose_name="3-ulush (Approver uchun)")
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

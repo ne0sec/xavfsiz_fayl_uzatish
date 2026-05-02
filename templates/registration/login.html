@@ -6,25 +6,91 @@
 <div class="row justify-content-center mt-5">
     <div class="col-md-5">
         <div class="card shadow">
-            <div class="card-header bg-dark text-white text-center">
-                <h4>Tizimga Kirish</h4>
+            <div class="card-header bg-primary text-white text-center">
+                <h4>🔑 Tizimga Kirish (E2EE)</h4>
             </div>
-            <div class="text-center mt-3"><a href="{% url 'register' %}">Yangi akkaunt yaratish</a></div>
             <div class="card-body">
-                <form method="post">
+                <form method="post" id="loginForm">
                     {% csrf_token %}
-                    <div class="mb-3">
-                        <label class="form-label">Foydalanuvchi nomi</label>
-                        <input type="text" name="username" class="form-control" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Parol</label>
-                        <input type="password" name="password" class="form-control" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary w-100">Kirish</button>
+                    
+                    {% for field in form %}
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.errors %}
+                                <div class="text-danger small mt-1">
+                                    {{ field.errors|striptags }}
+                                </div>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                    
+                    <button type="submit" id="submitBtn" class="btn btn-primary w-100 mt-3">Kirish</button>
                 </form>
+            </div>
+            <div class="card-footer text-center">
+                <small>Akkauntingiz yo'qmi? <a href="{% url 'register' %}">Ro'yxatdan o'ting</a></small>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('loginForm');
+    const passwordInput = document.querySelector('input[type="password"]');
+    const submitBtn = document.getElementById('submitBtn');
+
+    // ArrayBuffer ni Base64 ga o'girish uskunasi
+    function bufferToBase64(buf) {
+        let bin = '';
+        const bytes = new Uint8Array(buf);
+        bytes.forEach((b) => bin += String.fromCharCode(b));
+        return window.btoa(bin);
+    }
+
+    form.addEventListener('submit', async function(e) {
+        // Agar kalit hali yasalmagan bo'lsa, jarayonni to'xtatib turamiz
+        if (!sessionStorage.getItem('user_kek')) {
+            e.preventDefault();
+            
+            const originalText = submitBtn.innerHTML;
+            submitBtn.innerHTML = "Xavfsizlik tekshiruvi... ⏳";
+            submitBtn.disabled = true;
+
+            try {
+                const password = passwordInput.value;
+                const enc = new TextEncoder();
+
+                // 1. Ro'yxatdan o'tgandagi kabi PBKDF2 orqali paroldan KEK yasaymiz
+                const keyMaterial = await window.crypto.subtle.importKey(
+                    "raw", enc.encode(password), {name: "PBKDF2"}, false, ["deriveBits", "deriveKey"]
+                );
+                // Aynan ro'yxatdan o'tishdagi "salt" ishlatilishi shart
+                const salt = enc.encode("CryptoDocsSalt2026"); 
+                const kek = await window.crypto.subtle.deriveKey(
+                    { name: "PBKDF2", salt: salt, iterations: 100000, hash: "SHA-256" },
+                    keyMaterial, { name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]
+                );
+
+                // 2. Yasalgan KEK ni eksport qilib, brauzerning sessionStorage'iga saqlaymiz
+                const exportedKek = await window.crypto.subtle.exportKey("raw", kek);
+                const kekBase64 = bufferToBase64(exportedKek);
+                
+                // sessionStorage faqat brauzer yopilguncha yashaydi
+                sessionStorage.setItem('user_kek', kekBase64);
+
+                // 3. Kalit tayyor bo'lgach, formani Django serveriga yuboramiz
+                form.submit();
+
+            } catch (error) {
+                console.error("Kriptografik xatolik:", error);
+                alert("Tizimga kirishda xatolik yuz berdi!");
+                submitBtn.innerHTML = originalText;
+                submitBtn.disabled = false;
+            }
+        }
+    });
+});
+</script>
 {% endblock %}

@@ -7,10 +7,10 @@
     <div class="col-md-6">
         <div class="card shadow">
             <div class="card-header bg-success text-white text-center">
-                <h4>Yangi Akkaunt Yaratish</h4>
+                <h4>Yangi Akkaunt Yaratish (E2EE)</h4>
             </div>
             <div class="card-body">
-                <form method="post">
+                <form method="post" id="registerForm">
                     {% csrf_token %}
                     
                     {% for field in form %}
@@ -25,7 +25,11 @@
                         </div>
                     {% endfor %}
                     
-                    <button type="submit" class="btn btn-success w-100 mt-3">Ro'yxatdan O'tish</button>
+                    <!-- E2EE kalitlari uchun yashirin maydonlar -->
+                    <input type="hidden" name="public_key" id="public_key">
+                    <input type="hidden" name="encrypted_private_key" id="encrypted_private_key">
+                    
+                    <button type="submit" id="submitBtn" class="btn btn-success w-100 mt-3">Ro'yxatdan O'tish</button>
                 </form>
             </div>
             <div class="card-footer text-center">
@@ -34,4 +38,87 @@
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('registerForm');
+    // Django odatda birinchi parol maydonini turi "password" qilib belgilaydi
+    const passwordInput = document.querySelector('input[type="password"]'); 
+    const submitBtn = document.getElementById('submitBtn');
+
+    // ArrayBuffer ni Base64 ga o'girish (serverga jo'natish uchun)
+    function bufferToBase64(buf) {
+        let bin = '';
+        const bytes = new Uint8Array(buf);
+        bytes.forEach((b) => bin += String.fromCharCode(b));
+        return window.btoa(bin);
+    }
+
+    form.addEventListener('submit', async function(e) {
+        // Agar kalitlar hali yasalmagan bo'lsa, formani serverga ketishini to'xtatamiz
+        if (!document.getElementById('public_key').value) {
+            e.preventDefault(); 
+            
+            // Tugmani o'chirib, foydalanuvchiga jarayon ketayotganini ko'rsatamiz
+            const originalBtnText = submitBtn.innerHTML;
+            submitBtn.innerHTML = "Xavfsizlik kalitlari yasalmoqda... ⏳";
+            submitBtn.disabled = true;
+
+            try {
+                const password = passwordInput.value;
+                const enc = new TextEncoder();
+
+                // 1. Paroldan KEK (Key Encryption Key) yasash (PBKDF2)
+                const keyMaterial = await window.crypto.subtle.importKey(
+                    "raw", enc.encode(password), {name: "PBKDF2"}, false, ["deriveBits", "deriveKey"]
+                );
+                // Xavfsizlik uchun qat'iy salt
+                const salt = enc.encode("CryptoDocsSalt2026"); 
+                const kek = await window.crypto.subtle.deriveKey(
+                    { name: "PBKDF2", salt: salt, iterations: 100000, hash: "SHA-256" },
+                    keyMaterial, { name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]
+                );
+
+                // 2. Asimmetrik RSA kalitlar juftligini yaratish
+                const keyPair = await window.crypto.subtle.generateKey(
+                    { name: "RSA-OAEP", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" },
+                    true, ["encrypt", "decrypt"]
+                );
+
+                // 3. Ochiq kalitni (Public Key) eksport qilish
+                const exportedPublicKey = await window.crypto.subtle.exportKey("spki", keyPair.publicKey);
+                const publicKeyBase64 = bufferToBase64(exportedPublicKey);
+
+                // 4. Yopiq kalitni (Private Key) eksport qilish
+                const exportedPrivateKey = await window.crypto.subtle.exportKey("pkcs8", keyPair.privateKey);
+                
+                // 5. Yopiq kalitni paroldan yasalgan KEK bilan shifrlash
+                const iv = window.crypto.getRandomValues(new Uint8Array(12));
+                const encryptedPrivateKeyBuffer = await window.crypto.subtle.encrypt(
+                    { name: "AES-GCM", iv: iv }, kek, exportedPrivateKey
+                );
+                
+                // IV va shifrlangan yopiq kalitni birlashtiramiz
+                const combined = new Uint8Array(iv.length + encryptedPrivateKeyBuffer.byteLength);
+                combined.set(iv, 0);
+                combined.set(new Uint8Array(encryptedPrivateKeyBuffer), iv.length);
+                const encryptedPrivateKeyBase64 = bufferToBase64(combined.buffer);
+
+                // 6. Qiymatlarni yashirin maydonlarga joylashtiramiz
+                document.getElementById('public_key').value = publicKeyBase64;
+                document.getElementById('encrypted_private_key').value = encryptedPrivateKeyBase64;
+
+                // Tayyor bo'lgach, formani asl holatda serverga yuboramiz
+                form.submit();
+
+            } catch (error) {
+                console.error("Kriptografik xatolik:", error);
+                alert("Xavfsizlik kalitlarini yaratishda xatolik yuz berdi!");
+                submitBtn.innerHTML = originalBtnText;
+                submitBtn.disabled = false;
+            }
+        }
+    });
+});
+</script>
 {% endblock %}

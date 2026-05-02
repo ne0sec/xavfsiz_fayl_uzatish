@@ -1,8 +1,40 @@
+# Python
 __pycache__/
-*.pyc
-db.sqlite3
-.env
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Virtual environment
 venv/
+env/
+.venv/
 .env/
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+media/
+encrypted_docs/
+
+# Environment variables — HECH QACHON git ga tushurilmasin!
+.env
+.env.local
+.env.production
+
+# IDE
 .idea/
 .vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Distribution
+dist/
+build/
+*.egg-info/

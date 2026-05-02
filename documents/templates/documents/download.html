@@ -1,0 +1,173 @@
+{% extends 'base.html' %}
+
+{% block title %}Hujjatni Deshifr Qilish va Yuklash{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-md-6">
+        <div class="card shadow border-success">
+            <div class="card-header bg-success text-white text-center fw-bold">
+                🔐 E2EE Deshifrlash va Yuklash
+            </div>
+            <div class="card-body text-center">
+                <h5 class="mb-3">Hujjat: <strong>{{ doc.title }}</strong></h5>
+                <p class="text-muted mb-4">
+                    Ushbu hujjat Zero-Knowledge arxitekturasi orqali himoyalangan. Hozir kompyuteringiz serverdan shifrlangan faylni va SSS ulushlarini yuklab oladi, ularni birlashtirib, hujjatni brauzeringizning o'zida asliga qaytaradi.
+                </p>
+
+                <!-- JS uchun kerakli yashirin ma'lumotlar -->
+                <input type="hidden" id="share2Enc" value="{{ share.share_2 }}">
+                <input type="hidden" id="share3Enc" value="{{ share.share_3 }}">
+                <input type="hidden" id="fileUrl" value="{{ file_url }}">
+                <input type="hidden" id="originalFileName" value="{{ doc.file.name }}">
+
+                <!-- Yuklanish holatini ko'rsatuvchi qism -->
+                <div id="statusArea" class="alert alert-info d-none" role="alert">
+                    <span id="statusText">Jarayon boshlanmoqda...</span>
+                </div>
+
+                <button id="downloadBtn" class="btn btn-success btn-lg w-100 mt-2">Hujjatni Deshifr qilish va Yuklash</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SSS algoritmi kutubxonasi (Ishonchli manba) -->
+<script src="https://cdn.jsdelivr.net/npm/secrets.js-grempe@2.0.0/secrets.min.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const downloadBtn = document.getElementById("downloadBtn");
+    const statusArea = document.getElementById("statusArea");
+    const statusText = document.getElementById("statusText");
+
+    function updateStatus(msg, type="info") {
+        statusArea.className = `alert alert-${type} mt-3`;
+        statusText.innerText = msg;
+    }
+
+    function base64ToBuffer(b64) {
+        const bin = window.atob(b64);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) {
+            bytes[i] = bin.charCodeAt(i);
+        }
+        return bytes.buffer;
+    }
+
+    function hexToBuffer(hex) {
+        const bytes = new Uint8Array(Math.ceil(hex.length / 2));
+        for (let i = 0; i < bytes.length; i++) {
+            bytes[i] = parseInt(hex.substr(i * 2, 2), 16);
+        }
+        return bytes.buffer;
+    }
+
+    downloadBtn.addEventListener("click", async function() {
+        try {
+            downloadBtn.disabled = true;
+            statusArea.classList.remove("d-none");
+            updateStatus("1/4: Yopiq kalit tekshirilmoqda... ⏳");
+
+            // 1. Qabul qiluvchining yopiq kalitini olish
+            const privKeyBase64 = sessionStorage.getItem('user_private_key');
+            if (!privKeyBase64) {
+                throw new Error("Sizning E2EE Yopiq kalitingiz topilmadi! Tizimga qaytadan kiring.");
+            }
+
+            const privKeyBuffer = base64ToBuffer(privKeyBase64);
+            const privateKey = await window.crypto.subtle.importKey(
+                "pkcs8", privKeyBuffer, { name: "RSA-OAEP", hash: "SHA-256" }, false, ["decrypt"]
+            );
+
+            updateStatus("2/4: SSS Ulushlari deshifr qilinmoqda... 🔐");
+
+            // 2. Ulushlarni deshifr qilish
+            // download.html ichidagi 65-qatorni quyidagicha o'zgartir:
+            const share2EncBase64 = document.getElementById("share2Enc").value.replace(/ /g, '+');
+            const share3EncBase64 = document.getElementById("share3Enc").value.replace(/ /g, '+');
+
+            if (!share2EncBase64 || !share3EncBase64) {
+                throw new Error("Ulushlar to'liq emas. Tasdiqlovchi hujjatni hali tasdiqlamagan bo'lishi mumkin.");
+            }
+
+            const share2DecBuffer = await window.crypto.subtle.decrypt(
+                { name: "RSA-OAEP" }, privateKey, base64ToBuffer(share2EncBase64)
+            );
+            const share3DecBuffer = await window.crypto.subtle.decrypt(
+                { name: "RSA-OAEP" }, privateKey, base64ToBuffer(share3EncBase64)
+            );
+
+            const dec = new TextDecoder();
+            const share2 = dec.decode(share2DecBuffer);
+            const share3 = dec.decode(share3DecBuffer);
+
+            // 3. AES kalitni SSS orqali tiklash
+            updateStatus("3/4: AES kaliti va Fayl yuklab olinmoqda... 📥");
+            const aesKeyHex = secrets.combine([share2, share3]);
+            
+            const aesKeyBuffer = hexToBuffer(aesKeyHex);
+            const aesKey = await window.crypto.subtle.importKey(
+                "raw", aesKeyBuffer, { name: "AES-GCM" }, false, ["decrypt"]
+            );
+
+            // 4. Serverdan shifrlangan faylni yuklab olish
+            const fileUrl = document.getElementById("fileUrl").value;
+            const response = await fetch(fileUrl);
+            if (!response.ok) throw new Error("Faylni serverdan yuklab olishda xatolik.");
+            
+            const encryptedFileBuffer = await response.arrayBuffer();
+
+            updateStatus("4/4: Fayl deshifr qilinmoqda... 🔓");
+            
+            // 5. Fayldan IV (dastlabki 12 bayt) va Data ni ajratish
+            const iv = encryptedFileBuffer.slice(0, 12);
+            const data = encryptedFileBuffer.slice(12);
+
+            // 6. AES-GCM orqali hujjatni asliga qaytarish
+            const decryptedFileBuffer = await window.crypto.subtle.decrypt(
+                { name: "AES-GCM", iv: new Uint8Array(iv) }, aesKey, data
+            );
+
+            // 7. Foydalanuvchi kompyuteriga faylni yuklash
+            updateStatus("✅ Muvaffaqiyatli! Hujjat kompyuteringizga yuklanmoqda...", "success");
+            
+            const blob = new Blob([decryptedFileBuffer], { type: "application/octet-stream" });
+            const downloadUrl = window.URL.createObjectURL(blob);
+            
+            // Asl fayl nomini tozalash (enc_ va /documents/ qismlarini olib tashlash)
+            // 🚨 Asl fayl nomini aqlli tozalash jarayoni
+            let originalName = document.getElementById("originalFileName").value;
+
+            // 1. URL dagi papka nomlarini qirqib tashlaymiz
+            originalName = originalName.split('/').pop();
+
+            // 2. Boshidagi "enc_" va oxiridagi ".enc" qo'shimchalarini toza qilib olib tashlaymiz
+            originalName = originalName.replace(/^enc_/, '').replace(/\.enc$/, '');
+
+            // 3. Agar fayl nomi kengaytmasiz qolib ketsa, uni himoya qilamiz
+            if (!originalName.includes('.')) originalName += '.pdf';
+
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = originalName;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            
+            window.URL.revokeObjectURL(downloadUrl);
+            
+            // Yuklab bo'lgach birozdan so'ng inbox ga qaytarish
+            setTimeout(() => {
+                window.location.href = "/documents/inbox/";
+            }, 3000);
+
+        } catch (error) {
+            console.error("Deshifrlash xatosi:", error);
+            updateStatus("❌ Xatolik yuz berdi: " + error.message, "danger");
+            downloadBtn.disabled = false;
+        }
+    });
+});
+</script>
+{% endblock %}

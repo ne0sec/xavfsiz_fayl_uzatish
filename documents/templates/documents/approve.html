@@ -1,0 +1,133 @@
+{% extends 'base.html' %}
+
+{% block title %}Hujjatni Tasdiqlash{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-md-6">
+        <div class="card shadow border-warning">
+            <div class="card-header bg-warning text-dark text-center fw-bold">
+                🛡️ E2EE Tasdiqlash Jarayoni
+            </div>
+            <div class="card-body text-center">
+                <h5 class="mb-3">Hujjat: <strong>{{ share.document.title }}</strong></h5>
+                <p class="text-muted mb-4">
+                    Siz ushbu hujjatni tasdiqlamoqchisiz. Kriptografik xavfsizlik (Zero-Knowledge) qoidalariga ko'ra, sizning ulushingiz brauzeringizda ochilib, Qabul qiluvchining ochiq kaliti bilan qayta shifrlanadi va xavfsiz tarzda unga uzatiladi.
+                </p>
+
+                <!-- JS ishlashi uchun serverdan kelgan yashirin ma'lumotlar -->
+                <input type="hidden" id="encryptedShare3" value="{{ share.share_3 }}">
+                <input type="hidden" id="receiverPubKey" value="{{ receiver_pub_key }}">
+                <input type="hidden" id="csrfToken" value="{{ csrf_token }}">
+
+                <button id="approveBtn" class="btn btn-success btn-lg w-100">Tasdiqlash va Ulushni Uzatish</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const approveBtn = document.getElementById("approveBtn");
+
+    // Yordamchi konvertatsiya funksiyalari
+    function base64ToBuffer(b64) {
+        const bin = window.atob(b64);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) {
+            bytes[i] = bin.charCodeAt(i);
+        }
+        return bytes.buffer;
+    }
+
+    function bufferToBase64(buffer) {
+        let binary = '';
+        const bytes = new Uint8Array(buffer);
+        bytes.forEach(b => binary += String.fromCharCode(b));
+        return window.btoa(binary);
+    }
+
+    approveBtn.addEventListener("click", async function() {
+        try {
+            const originalText = approveBtn.innerHTML;
+            approveBtn.innerHTML = "Kriptografik tasdiqlash bajarilmoqda... ⏳";
+            approveBtn.disabled = true;
+
+            const privKeyBase64 = sessionStorage.getItem('user_private_key');
+            if (!privKeyBase64) {
+                throw new Error("Sizning E2EE Yopiq kalitingiz topilmadi! Iltimos, tizimdan chiqib, qaytadan kiring.");
+            }
+
+            const privKeyBuffer = base64ToBuffer(privKeyBase64);
+            const privateKey = await window.crypto.subtle.importKey(
+                "pkcs8", privKeyBuffer, { name: "RSA-OAEP", hash: "SHA-256" }, false, ["decrypt"]
+            );
+
+            const encryptedShare3Base64 = document.getElementById("encryptedShare3").value.replace(/ /g, '+');
+            
+            // ==========================================
+            // 🚨 DIAGNOSTIKA VA XAVFSIZLIK TEKSHIRUVI
+            // ==========================================
+            if (!encryptedShare3Base64 || encryptedShare3Base64 === "None") {
+                throw new Error("Serverdan ulush bo'sh keldi! Yuboruvchi faylni to'g'ri shifrlamagan.");
+            }
+            if (encryptedShare3Base64.length < 300) {
+                throw new Error(`Baza ulushni qirqib tashlagan! Uzunlik: ${encryptedShare3Base64.length} ta harf. (Aslida 344 atrofida bo'lishi shart). Eski hujjatlar bilan ishlamang, mutlaqo yangi hujjat yuklang!`);
+            }
+
+            const encryptedShare3Buffer = base64ToBuffer(encryptedShare3Base64);
+            
+            let decryptedShareBuffer;
+            try {
+                decryptedShareBuffer = await window.crypto.subtle.decrypt(
+                    { name: "RSA-OAEP" }, privateKey, encryptedShare3Buffer
+                );
+            } catch (decryptErr) {
+                console.error("Decrypt Error Detallari:", decryptErr);
+                throw new Error("Sizning Yopiq kalitingiz bu hujjatni ocha olmadi! (Qulf va kalit mos emas). Sababi: Eski profillar qolib ketgan bo'lishi mumkin. Yuboruvchi va Tasdiqlovchi profillarini o'chirib, noldan yangi akkauntlar orqali tekshiring!");
+            }
+            // ==========================================
+
+            const receiverPubKeyBase64 = document.getElementById("receiverPubKey").value;
+            const receiverPubKeyBuffer = base64ToBuffer(receiverPubKeyBase64);
+            const receiverPublicKey = await window.crypto.subtle.importKey(
+                "spki", receiverPubKeyBuffer, { name: "RSA-OAEP", hash: "SHA-256" }, false, ["encrypt"]
+            );
+
+            const reEncryptedShareBuffer = await window.crypto.subtle.encrypt(
+                { name: "RSA-OAEP" }, receiverPublicKey, decryptedShareBuffer
+            );
+            const reEncryptedShareBase64 = bufferToBase64(reEncryptedShareBuffer);
+
+            const csrfToken = document.getElementById("csrfToken").value;
+            const formData = new URLSearchParams();
+            formData.append('re_encrypted_share_3', reEncryptedShareBase64);
+            formData.append('csrfmiddlewaretoken', csrfToken);
+
+            const response = await fetch(window.location.href, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.status === 'success') {
+                window.location.href = "/documents/inbox/";
+            } else {
+                throw new Error(result.message || "Server xatosi");
+            }
+
+        } catch (error) {
+            console.error("Tasdiqlashda xatolik:", error);
+            alert("Xavfsizlik tizimida xatolik yuz berdi:\n\n" + error.message);
+            approveBtn.innerHTML = "Tasdiqlash va Ulushni Uzatish";
+            approveBtn.disabled = false;
+        }
+    });
+});
+</script>
+{% endblock %}
