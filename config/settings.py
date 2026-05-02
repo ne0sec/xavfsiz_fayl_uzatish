@@ -12,7 +12,6 @@ ALLOWED_HOSTS = config(
     default='localhost,127.0.0.1'
 ).split(',')
 
-# CSRF — Render domain uchun
 CSRF_TRUSTED_ORIGINS = config(
     'CSRF_TRUSTED_ORIGINS',
     default='http://localhost:8000'
@@ -32,6 +31,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'storages',
     'accounts',
     'documents',
     'audit',
@@ -69,8 +69,8 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
+# --- Database ---
 DATABASE_URL = config('DATABASE_URL', default=None)
-
 if DATABASE_URL:
     import dj_database_url
     DATABASES = {
@@ -96,12 +96,35 @@ TIME_ZONE = 'Asia/Tashkent'
 USE_I18N = True
 USE_TZ = True
 
+# --- Static fayllar (WhiteNoise) ---
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+# --- Backblaze B2 Storage ---
+B2_ENABLED = config('B2_ENABLED', default=False, cast=bool)
+
+if B2_ENABLED:
+    # Backblaze B2 — S3-compatible API
+    AWS_ACCESS_KEY_ID     = config('B2_KEY_ID')
+    AWS_SECRET_ACCESS_KEY = config('B2_APPLICATION_KEY')
+    AWS_STORAGE_BUCKET_NAME = config('B2_BUCKET_NAME')
+    AWS_S3_ENDPOINT_URL   = config('B2_ENDPOINT_URL')
+    # Masalan: https://s3.us-west-004.backblazeb2.com
+
+    AWS_S3_OBJECT_PARAMETERS = {
+        'ContentDisposition': 'attachment',
+    }
+    AWS_DEFAULT_ACL = 'private'        # Fayllar private — faqat URL bilan ochiladi
+    AWS_QUERYSTRING_AUTH = True        # Signed URL — vaqtincha ruxsat
+    AWS_QUERYSTRING_EXPIRE = 300       # 5 daqiqa (300 sekund)
+
+    DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+    MEDIA_URL = f"{config('B2_ENDPOINT_URL')}/{config('B2_BUCKET_NAME')}/"
+else:
+    # Lokal ishlatish uchun (development)
+    MEDIA_URL = '/media/'
+    MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = 'accounts.CustomUser'
