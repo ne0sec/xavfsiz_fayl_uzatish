@@ -2,7 +2,6 @@ import json
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.views.decorators.cache import never_cache
 from django.core.files.base import ContentFile
 from django.db.models import Q
 from django.http import HttpResponse, JsonResponse
@@ -48,7 +47,6 @@ def inbox(request):
     })
 
 @login_required
-@never_cache
 def upload_document(request):
     if request.method == 'POST':
         is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
@@ -85,7 +83,8 @@ def upload_document(request):
             description=description,
             privacy_level=privacy_level,
             file=uploaded_file,
-            sha256_hash=sha256_hash
+            sha256_hash=sha256_hash,
+            original_filename=request.POST.get('original_filename', '')
         )
 
         if privacy_level == 'protected' and is_e2ee:
@@ -179,12 +178,41 @@ def download_document(request, share_id):
         return render(request, 'documents/download.html', {
             'share': share,
             'doc': doc,
-            'file_url': doc.file.url 
+            'file_url': f"/documents/proxy-file/{share_id}/"
         })
-        
+
     except Exception as e:
         messages.error(request, f"Xatolik yuz berdi: {str(e)}")
         return redirect('inbox')
+
+
+@login_required
+def proxy_file(request, share_id):
+    """Backblaze B2 yoki lokal faylni server orqali brauzerga uzatadi (CORS muammosini hal qiladi)"""
+    import requests as req_lib
+    try:
+        share = DocumentShare.objects.get(id=share_id, receiver=request.user)
+        doc = share.document
+
+        if doc.privacy_level == 'protected' and share.status != 'approved':
+            return HttpResponse("Ruxsat yo'q", status=403)
+
+        file_url = doc.file.url
+
+        # Agar tashqi URL (Backblaze) bo'lsa — proxy qilamiz
+        if file_url.startswith('http'):
+            r = req_lib.get(file_url, timeout=30)
+            response = HttpResponse(r.content, content_type='application/octet-stream')
+        else:
+            # Lokal fayl
+            response = HttpResponse(doc.file.read(), content_type='application/octet-stream')
+
+        response['Content-Disposition'] = f'attachment; filename="{doc.original_filename or "file.enc"}"'
+        response['Access-Control-Allow-Origin'] = '*'
+        return response
+
+    except Exception as e:
+        return HttpResponse(f"Xatolik: {str(e)}", status=500)
 
 @login_required
 def sss_demo(request):

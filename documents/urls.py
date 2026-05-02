@@ -14,6 +14,7 @@ urlpatterns = [
     path('approve/<int:share_id>/', views.approve_document, name='approve_document'),
     path('reject/<int:share_id>/', views.reject_document, name='reject_document'),
     path('download/<int:share_id>/', views.download_document, name='download_document'),
+    path('proxy-file/<int:share_id>/', views.proxy_file, name='proxy_file'),
     
     # Kriptografiya demosi (agar kerak bo'lsa)
     path('sss-demo/', views.sss_demo, name='sss_demo'),
