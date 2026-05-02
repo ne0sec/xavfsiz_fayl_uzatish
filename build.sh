@@ -3,11 +3,11 @@ set -o errexit
 
 pip install -r requirements.txt
 
-python manage.py collectstatic --noinput
+python manage.py makemigrations
 python manage.py migrate
+python manage.py collectstatic --noinput
 
-# Superuser avtomatik yaratish (faqat birinchi marta)
-# Render Environment Variables dan oladi: DJANGO_SUPERUSER_USERNAME, PASSWORD, EMAIL
+# Superuser avtomatik yaratish
 python manage.py shell << 'PYEOF'
 from django.contrib.auth import get_user_model
 import os
@@ -30,5 +30,5 @@ elif not User.objects.filter(username=username).exists():
     )
     print(f"Superuser '{username}' muvaffaqiyatli yaratildi.")
 else:
-    print(f"Superuser '{username}' allaqachon mavjud, o'tkazib yuborildi.")
+    print(f"Superuser '{username}' allaqachon mavjud.")
 PYEOF
