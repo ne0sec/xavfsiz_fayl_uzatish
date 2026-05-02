@@ -72,20 +72,29 @@ def upload_document(request):
         import hashlib
         file_data = uploaded_file.read()
         sha256_hash = hashlib.sha256(file_data).hexdigest()
-        # Faylni boshiga qaytarish (keyin saqlash uchun)
-        from django.core.files.uploadedfile import InMemoryUploadedFile
-        import io
         uploaded_file.seek(0)
 
-        document = Document.objects.create(
-            owner=request.user,
-            title=title,
-            description=description,
-            privacy_level=privacy_level,
-            file=uploaded_file,
-            sha256_hash=sha256_hash,
-            original_filename=request.POST.get('original_filename', '')
-        )
+        try:
+            document = Document.objects.create(
+                owner=request.user,
+                title=title,
+                description=description,
+                privacy_level=privacy_level,
+                file=uploaded_file,
+                sha256_hash=sha256_hash,
+                original_filename=request.POST.get('original_filename', '')
+            )
+        except Exception as e:
+            import traceback
+            err_detail = traceback.format_exc()
+            print("FAYL SAQLASH XATOSI:", err_detail)
+            if is_ajax:
+                return JsonResponse({
+                    "status": "error",
+                    "message": f"Fayl saqlashda xatolik: {str(e)}"
+                }, status=500)
+            messages.error(request, f"Fayl saqlashda xatolik: {str(e)}")
+            return redirect('upload_document')
 
         if privacy_level == 'protected' and is_e2ee:
             share_1 = request.POST.get('share_1')
